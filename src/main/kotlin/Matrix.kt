@@ -1,4 +1,11 @@
+import kotlin.jvm.Throws
+
 class Matrix (private val rows: Int, private val cols: Int) {
+
+    enum class AXIS {
+        COLUMN_WISE, ROW_WISE, BOTH
+    }
+
     private val data = Array(rows * cols){0}
     val size = Pair(rows, cols)
     private val length = rows * cols
@@ -51,6 +58,36 @@ class Matrix (private val rows: Int, private val cols: Int) {
         return builder.toString()
     }
 
+    fun arg_max(axis: AXIS, indx: Int): Int {
+        return when (axis) {
+            AXIS.ROW_WISE -> {
+                val slice = data.slice(indx*cols until indx*cols + cols)
+                val idx = data.indexOf(slice.max())
+                idx
+            }
+            AXIS.COLUMN_WISE -> {
+                val slice = data.filterIndexed { index, _ -> index % cols == indx }
+                val idx = data.indexOf(slice.max())
+                idx
+            }
+            AXIS.BOTH -> {
+                val idx = data.indexOf(data.max())
+                idx
+            }
+
+        }
+    }
+
+    fun swap(row1:Int, row2:Int) {
+        require(row1 in 0 until rows && row2 in 0 until rows) {"$row1 or $row2 out of range for matrix with $rows rows"}
+        val row1Index = unsafe_indx(row1, 0)
+        val row2Index = unsafe_indx(row2, 0)
+        for (i in 0 until cols) {
+            val temp = data[row1Index+i]
+            data[row1Index + i] = data[row2Index + i]
+            data[row2Index + i] = temp
+        }
+    }
     fun sum(B: Matrix) {
         require(this.size == B.size){"Matrix operand's sizes do not match"}
         for(i in 0 until this.length){
@@ -121,6 +158,27 @@ class Matrix (private val rows: Int, private val cols: Int) {
                 }
             }
             return res
+        }
+
+        @Throws
+        fun concat(A: Matrix, B: Matrix, dim: AXIS): Matrix {
+            return when(dim) {
+                AXIS.ROW_WISE -> {
+                    // When we concatenate row wise, we have the same number of rows but the columns number is the same
+                    require(A.rows == B.rows) {"Cannot concatenate a matrix with ${A.rows} with a ${B.rows} matrix row-wise"}
+                    val res = Matrix(A.rows, A.cols + B.cols)
+                    res
+                }
+                AXIS.COLUMN_WISE -> {
+                    require(A.cols == B.cols) {"Cannot concatenate a matrix with ${A.cols} with a ${B.cols} matrix row-wise"}
+                    val res = Matrix(A.rows, A.cols + B.cols)
+
+                    res
+                }
+                else -> {
+                    throw IllegalArgumentException("dim argument cannot be AXIS.Both for concatenation axis")
+                }
+            }
         }
     }
 
