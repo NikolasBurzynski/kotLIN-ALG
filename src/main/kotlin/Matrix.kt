@@ -163,6 +163,10 @@ class Matrix (private val rows: Int, private val cols: Int) {
         }
     }
 
+    fun split(index: Int, axis: AXIS): Pair<Matrix, Matrix?> {
+        return Matrix.split(this, index, axis)
+    }
+
     fun swap(row1:Int, row2:Int) {
         require(row1 in 0 until rows && row2 in 0 until rows) {"$row1 or $row2 out of range for matrix with $rows rows"}
         val row1Index = unsafe_indx(row1, 0)
@@ -287,15 +291,62 @@ class Matrix (private val rows: Int, private val cols: Int) {
             }
         }
 
-        fun split(index : Int, axis:Matrix): Pair<Matrix, Matrix> {
+        @Throws
+        fun split(A: Matrix, index : Int, axis:Matrix.AXIS): Pair<Matrix, Matrix?> {
+            require(axis != AXIS.BOTH) {"Split currently only works on ROW_WISE and COLUMN_WISE"}
+            val leftDim = when (axis) {
+                AXIS.ROW_WISE -> {
+                    require (index in 0 until A.rows) {"Cannot split a Matrix with ${A.rows} rows along the $index indexed row"}
+                    A.rows - index
+                }
+                AXIS.COLUMN_WISE -> {
+                    require (index in 0 until A.cols) {"Cannot split a Matrix with ${A.cols} cols along the $index indexed col"}
+                    A.cols - index
+                }
+                AXIS.BOTH -> {
+                    throw IllegalArgumentException()
+                }
+            }
+            if (leftDim == 1) { //This is the case that we are splitting on the last row or col index, so we just return (A, null)
+                return Pair(A, null)
+            }
 
+            return when (axis) {
+                AXIS.ROW_WISE -> {
+                    val topMatrix = Matrix(index + 1, A.cols)
+                    val botMatrix = Matrix(A.rows - (index + 1), A.cols)
+                    for(i in topMatrix.data.indices) {
+                        topMatrix.data[i] = A.data[i]
+                    }
+                    for(j in botMatrix.data.indices) {
+                        botMatrix.data[j] = A.data[j + topMatrix.data.size]
+                    }
+                    Pair(topMatrix, botMatrix)
+                }
+                AXIS.COLUMN_WISE -> {
+                    val leftMatrix = Matrix(A.rows, index + 1)
+                    val rightMatrix = Matrix(A.rows , A.cols - (index + 1))
+                    for(i in 0 until A.rows) {
+                        for(j in 0 until leftMatrix.cols) {
+                            leftMatrix.data[leftMatrix.unsafe_indx(i, j)] = A.data[A.unsafe_indx(i,j)]
+                        }
+                        for(j in 0 until rightMatrix.cols) {
+                            rightMatrix.data[rightMatrix.unsafe_indx(i, j)] = A.data[A.unsafe_indx(i, j + leftMatrix.cols)]
+                        }
+                    }
+                    Pair(leftMatrix, rightMatrix)
+                }
+                else -> {
+                    throw IllegalArgumentException()
+                }
+            }
         }
 
-        fun getInverse(A: Matrix) : Matrix {
-            require(A.cols == A.rows){"Haven't implemented left and right non equal inverses yet"}
-            val res = Matrix.concat(A, Matrix.getIdentity(A.cols,A.cols), Matrix.AXIS.COLUMN_WISE).toRREF()
-
-        }
+//        fun getInverse(A: Matrix) : Matrix {
+//            require(A.cols == A.rows){"Haven't implemented left and right non-equal inverses yet"}
+//            val res = Matrix.concat(A, Matrix.getIdentity(A.cols,A.cols), Matrix.AXIS.COLUMN_WISE).toRREF()
+//
+//        }
 
         fun getIdentity(cols: Int, rows: Int) : Matrix {
             require(cols == rows) {"You cannot have a non-square identity matrix, make sure rows == cols"}
