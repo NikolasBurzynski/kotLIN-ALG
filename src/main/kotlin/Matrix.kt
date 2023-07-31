@@ -1,12 +1,15 @@
 import kotlin.jvm.Throws
+import kotlin.math.abs
 
 class Matrix (private val rows: Int, private val cols: Int) {
+
+    constructor(size : Pair<Int, Int>) : this(size.first, size.second)
 
     enum class AXIS {
         COLUMN_WISE, ROW_WISE, BOTH
     }
 
-    private val data = Array(rows * cols){0}
+    private val data = Array(rows * cols){0f}
     val size = Pair(rows, cols)
     private val length = rows * cols
 
@@ -20,11 +23,11 @@ class Matrix (private val rows: Int, private val cols: Int) {
         return i*cols+j
     }
 
-    operator fun get(i: Int, j: Int): Int {
+    operator fun get(i: Int, j: Int): Float {
         return data[indx(i,j)]
     }
 
-    operator fun set(i:Int, j:Int, b:Int) {
+    operator fun set(i:Int, j:Int, b:Float) {
         data[indx(i,j)] = b
     }
 
@@ -54,7 +57,7 @@ class Matrix (private val rows: Int, private val cols: Int) {
             }
             builder.append("\n")
         }
-        builder.append("]")
+        builder.append("]\n")
         return builder.toString()
     }
 
@@ -74,7 +77,89 @@ class Matrix (private val rows: Int, private val cols: Int) {
                 val idx = data.indexOf(data.max())
                 idx
             }
+        }
+    }
 
+    private fun scale(row: Int, scalar: Float) {
+        for(col in 0 until cols) {
+            data[unsafe_indx(row, col)] *= scalar
+        }
+    }
+
+    public fun matScale(scalar: Float) {
+        for(i in data.indices) {
+            data[i] *= scalar
+        }
+    }
+
+    private fun op3(row1: Int, row2: Int, scalar: Float) {
+        for(col in 0 until cols) {
+            data[unsafe_indx(row2, col)] = scalar * data[unsafe_indx(row1, col)] + data[unsafe_indx(row2, col)]
+        }
+    }
+
+//    fun findInverse()
+
+    fun toRREF(): Matrix {
+        var m = rows
+        var n = cols
+        var r = -1
+
+        for(j in 0 until n){
+            var i = r + 1
+            while (i < m && data[unsafe_indx(i , j)] == 0f) {
+                i += 1
+            }
+            if (i < m) {
+                r += 1
+                swap(i , r)
+                scale(r, (1/data[unsafe_indx(r, j)]))
+                for (k in 0 until m) {
+                    if(k != r) {
+                        op3(r, k, -1 * data[unsafe_indx(k,j)])
+                    }
+                }
+            }
+        }
+        return this
+    }
+
+    fun toREF(): Unit{
+        var h = 0 //Pivot row
+        var k = 0 //Pivot col
+        val m = rows
+        val n = cols
+
+        while (h < m && k < n) {
+            // Find the Kth pivot
+            var maxRow = 0
+            var maxVal = 0f
+
+            //ARGMAX from h to m
+            for(i in h until m) {
+                if (abs(data[unsafe_indx(i,k)]) > maxVal) {
+                    maxVal = abs(data[unsafe_indx(i,k)])
+                    maxRow = i
+                }
+            }
+
+
+            if(data[unsafe_indx(maxRow, k)] == 0f) {
+                //No Pivot in this column, pass to the next column
+                k += 1
+            } else {
+                swap(h, maxRow)
+                for (i in (h + 1) until m) {
+                    val f: Float = data[unsafe_indx(i , k)] / data[unsafe_indx(h , k)]
+                    println(f)
+                    data[unsafe_indx(i,k)] = 0f
+                    for (j in (k + 1) until n) {
+                        data[unsafe_indx(i , j)] = data[unsafe_indx(i , j)] - (data[unsafe_indx(h , j)] * f)
+                    }
+                }
+                h += 1
+                k += 1
+            }
         }
     }
 
@@ -122,16 +207,16 @@ class Matrix (private val rows: Int, private val cols: Int) {
             return res;
         }
 
-        private fun dot(A: List<Int>, B: List<Int>): Int {
+        private fun dot(A: List<Float>, B: List<Float>): Float {
             assert(A.size == B.size)
-            var acc = 0
+            var acc = 0f
             for(i in A.indices) {
                 acc += A[i] * B[i];
             }
             return acc
         }
 
-        fun fromArray(input: Array<Int>, pair: Pair<Int, Int>): Matrix {
+        fun fromArray(input: Array<Float>, pair: Pair<Int, Int>): Matrix {
             require(input.size == pair.first * pair.second) {"Cannot make a ${pair.first}x${pair.second} matrix with ${input.size} elements"}
             val res = Matrix(pair.first, pair.second);
             for(i in input.indices) {
@@ -144,11 +229,11 @@ class Matrix (private val rows: Int, private val cols: Int) {
         fun matmul(A: Matrix, B: Matrix): Matrix {
             require(A.cols == B.rows){"The column size of Operand 1 must equal the row size of Operand 2 to multiply matrices"}
             val res = Matrix(A.rows, B.cols)
-            val col_map = HashMap<Int, List<Int>>()
+            val col_map = HashMap<Int, List<Float>>()
             for(i in 0 until A.rows) {
                 val row = A.data.slice(i*A.cols until i*A.cols + A.cols)
                 for(j in 0 until B.cols) {
-                    var col : List<Int>
+                    var col : List<Float>
                     if(j in col_map.keys) col = col_map[j]!!
                     else {
                         col = B.data.filterIndexed { index, _ -> index % B.cols == j }
@@ -156,6 +241,14 @@ class Matrix (private val rows: Int, private val cols: Int) {
                     }
                     res[i, j] = dot(row, col)
                 }
+            }
+            return res
+        }
+
+        fun scale(A: Matrix, scalar: Float) : Matrix {
+            val res  = Matrix(A.size)
+            for (i in res.data.indices) {
+                res.data[i] = A.data[i] * scalar
             }
             return res
         }
@@ -192,6 +285,25 @@ class Matrix (private val rows: Int, private val cols: Int) {
                     throw IllegalArgumentException("dim argument cannot be AXIS.Both for concatenation axis")
                 }
             }
+        }
+
+        fun split(index : Int, axis:Matrix): Pair<Matrix, Matrix> {
+
+        }
+
+        fun getInverse(A: Matrix) : Matrix {
+            require(A.cols == A.rows){"Haven't implemented left and right non equal inverses yet"}
+            val res = Matrix.concat(A, Matrix.getIdentity(A.cols,A.cols), Matrix.AXIS.COLUMN_WISE).toRREF()
+
+        }
+
+        fun getIdentity(cols: Int, rows: Int) : Matrix {
+            require(cols == rows) {"You cannot have a non-square identity matrix, make sure rows == cols"}
+            val res = Matrix(cols, rows)
+            for(i in 0 until cols) {
+                res.data[res.unsafe_indx(i, i)] = 1f
+            }
+            return res
         }
     }
 
