@@ -163,16 +163,29 @@ class Matrix (private val rows: Int, private val cols: Int) {
         @Throws
         fun concat(A: Matrix, B: Matrix, dim: AXIS): Matrix {
             return when(dim) {
-                AXIS.ROW_WISE -> {
+                AXIS.COLUMN_WISE -> {
                     // When we concatenate row wise, we have the same number of rows but the columns number is the same
-                    require(A.rows == B.rows) {"Cannot concatenate a matrix with ${A.rows} with a ${B.rows} matrix row-wise"}
+                    require(A.rows == B.rows) {"Cannot concatenate a matrix with ${A.rows} rows with a ${B.rows} rowed matrix column-wise"}
                     val res = Matrix(A.rows, A.cols + B.cols)
+                    for(i in 0 until A.rows) {
+                        for(j in 0 until A.cols) {
+                            res.data[res.unsafe_indx(i,j)] = A.data[A.unsafe_indx(i,j)]
+                        }
+                        for(j in 0 until B.cols) {
+                            res.data[res.unsafe_indx(i,A.cols + j)] = B.data[B.unsafe_indx(i,j)]
+                        }
+                    }
                     res
                 }
-                AXIS.COLUMN_WISE -> {
-                    require(A.cols == B.cols) {"Cannot concatenate a matrix with ${A.cols} with a ${B.cols} matrix row-wise"}
-                    val res = Matrix(A.rows, A.cols + B.cols)
-
+                AXIS.ROW_WISE -> {
+                    require(A.cols == B.cols) {"Cannot concatenate a matrix with ${A.cols} columns with a ${B.cols} columned matrix row-wise"}
+                    val res = Matrix(A.rows + B.rows, A.cols)
+                    for(i in 0 until A.data.size) {
+                        res.data[i] = A.data[i]
+                    }
+                    for(i in 0 until B.data.size) {
+                        res.data[A.data.size + i] = B.data[i]
+                    }
                     res
                 }
                 else -> {
