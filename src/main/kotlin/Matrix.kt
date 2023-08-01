@@ -348,6 +348,17 @@ class Matrix (private val rows: Int, private val cols: Int) {
 //
 //        }
 
+
+        fun transpose(A: Matrix): Matrix {
+            val res = Matrix(A.cols, A.rows)
+            for(i in 0 until res.rows) {
+                for (j in 0 until res.cols) {
+                    res.data[res.unsafe_indx(i,j)] = A.data[A.unsafe_indx(j,i)]
+                }
+            }
+            return res
+        }
+
         fun getIdentity(cols: Int, rows: Int) : Matrix {
             require(cols == rows) {"You cannot have a non-square identity matrix, make sure rows == cols"}
             val res = Matrix(cols, rows)
